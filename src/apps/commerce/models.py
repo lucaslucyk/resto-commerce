@@ -6,6 +6,8 @@ from decimal import Decimal
 
 from datetime import datetime
 
+from utils import mercadopago
+
 # Create your models here.
 class Order(models.Model):
     fecha = models.DateTimeField(default=datetime.now())
@@ -50,6 +52,37 @@ class Order(models.Model):
                 ammounts.append(line.quantity * line.item.custom_price)
         
         return sum(ammounts)
+
+    def update_payment_status(self):
+        """ Update status consulting payment on Mercadopago """
+
+        # get access token 
+        access_token = self.branch.restaurant.mp_access_token
+        if not self.branch.use_restaurant_credentials:
+            access_token = self.branch.mp_branch_access_token
+
+        # create client
+        mp = mercadopago.MP(access_token)
+
+        # getting orders
+        order_filters = {"preference_id": self.preference_id}
+        orders = mp.search_order(order_filters, limit=30)
+
+        for order in orders["response"]["elements"]:
+            payment_filters = {"order.id": order.get("id")}
+            payments = mp.search_payment(payment_filters, limit=30)
+
+            if not payments["status"] == 200:
+                continue
+            if not payments["response"]["results"]:
+                continue
+
+            for payment in payments["response"]["results"]:
+                if payment["status"] == "approved":
+                    if self.amount == payment["transaction_amount"]:
+                        self.status = settings.ESTADOS[1][0]
+                        self.save()
+                        return
 
     def __str__(self):
         return f'{self.fecha} ({self.get_status_display()})'

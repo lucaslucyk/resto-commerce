@@ -1,4 +1,4 @@
-import mercadopago
+from utils import mercadopago
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -86,7 +86,4 @@ def mp_callback(request, order, context=None):
         
         "order-ammoount": float(order.amount),
         "order-items": preference["response"]["items"],
-    }) 
-
-
-    
+    })
